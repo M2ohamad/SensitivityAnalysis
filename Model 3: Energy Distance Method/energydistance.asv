@@ -1,0 +1,85 @@
+% This script provides an example application of Energy Distance.
+%
+% METHODS
+%
+% The energy distance statistic is calculated first for samples of the
+% input space, then for samples of the output.
+%
+% MODEL AND STUDY AREA
+%
+% The model under study is a DC-DC converter that considers
+% two variables input paramaters, frequency and inductance value, and a
+% constant input, alpha. The scalar output is the change in current Y.
+%
+% INDEX
+% Steps:
+% 1. Setup Model
+% 2. Sample Input Parameters
+% 3. Calculate Energy Distance of Inputs
+% 4. Run the model against input samples
+% 5. Calculate Energy Distance of Outputs for L and F
+%
+% This script is prepared by Mohamad Mohamad at Centrale Supelec (2019)
+% This script uses functions provided in the SAFE Toolbox by F. Pianosi, F. Sarrazin
+% and T. Wagener at Bristol University (2015).
+% SAFE is provided without any warranty and for non-commercial use only.
+
+%% Step 1 (setup model)
+close all; clear all;
+
+% Define Inputs
+alpha = 0.5 ;
+U = 100; % [V]
+
+x_labels = {'Inductance [H]' , 'Frequency [Hz]'} ;
+DistRange = { [1e-3 1e-2]; [5e3 5e4];} ;
+
+% Define output
+myfun = 'modelfunction' ;
+
+%% Step 2 (sample input space)
+SampStrategy = 'rsu' ; % Random Uniform Sampling
+N = 4900 ;
+M = length(DistRange) ; % Number of Parameters
+DistType = 'unif' ;
+LF = AAT_sampling(SampStrategy,M,DistType,DistRange,N) ;
+% LF_2 = AAT_sampling(SampStrategy,M,DistType,DistRange,N) ;
+
+%% Step 3 (E-statistic for input)
+% D^2(X,Y) = 2A - B - C
+% [D, Dnormalized] = calculateED(LF,LF_2);
+
+%% Step 4 (run the model)
+Y = model_evaluation(myfun,LF,alpha,U);
+
+%% Step 5 (E-statistic for output)
+x1_LFI = sortrows( cat( 2, LF, Y), 1 ) ;    % Sorting by ascending L values
+
+% Split X data into intervals
+nIntervals = sqrt(N) ;                           % Number of intervals
+intervalSize = length(LF) / nIntervals ; 
+
+% Calculate Influence of L on Y
+[L_totalInfluence, L_EDintervals] = calc_totalInfluence(x1_LFI, Y, nIntervals, intervalSize) ;
+
+% Resorting based on ascending F values
+x1_LFI = sortrows( cat( 2, LF, Y) , 2) ; 
+
+% Calculate Influence of F on Y
+[F_totalInfluence, F_EDintervals] = calc_totalInfluence(x1_LFI, Y, nIntervals, intervalSize) ;
+
+%% To do
+% Convergence:
+%    - nInterval should be sqrt(N), but integer value. So pick a desired N
+%    value, then make its sqrt an integer, then square that to get the real
+%    N values to be used in convergence
+k = 20:10:70 ;
+F_tI = zeros(1,length(k));
+for i=1:length(k)
+    nIntervals = k(i) ;
+    N = k(i)^2 ; display(N);
+    intervalSize = N / nIntervals ;
+    F_tI(i) = calc_totalInfluence(x1_LFI(1:N,:), Y(1:N), nIntervals, intervalSize) ; 
+end
+plot_convergence(F_tI,k.^2,[],[],[],[
+% Consider replacing for loops with matrix using repmat as shown
